@@ -74,11 +74,11 @@ function thresholdsize = fMRIMonteCluster(volumesize,localp,oneortwotails,global
 
     CheckArgsValid(volumesize,localp,oneortwotails,globalp,fwhm,mask,volumeormass,numiter,distribution,localdf,nummaps,connectivity,savename)
     [csallsize, csallnum, maxclustersizes] = GetSimulatedClusters(volumesize,localp,oneortwotails,fwhm,mask,volumeormass,numiter,distribution,localdf,nummaps,connectivity);
-    [cumdf, unique_maxcs, nmaxcs, cummaxcs, thresholdsize] = ProcessClusterResults(csallsize, csallnum, maxclustersizes, globalp);
+    [cumdf, unique_maxcs, nmaxcs, desc_prop_maxcs, thresholdsize] = ProcessClusterResults(csallsize, csallnum, maxclustersizes, globalp);
     if ~isempty(savename) % Optional save data
         save(savename)
     end
-    DisplayResults(csallsize, csallnum, cumdf, unique_maxcs, nmaxcs, cummaxcs, globalp, thresholdsize)
+    DisplayResults(csallsize, csallnum, cumdf, unique_maxcs, nmaxcs, desc_prop_maxcs, globalp, thresholdsize)
 
 % --------------------
 function CheckArgsValid(volumesize,localp,oneortwotails,globalp,fwhm,mask,volumeormass,numiter,distribution,localdf,nummaps,connectivity,savename)
@@ -167,7 +167,7 @@ function [csallsize, csallnum, maxclustersizes] = GetSimulatedClusters(volumesiz
     end
 
 % --------------------
-function [cumdf, unique_maxcs, nmaxcs, cummaxcs, thresholdsize] = ProcessClusterResults(csallsize, csallnum, maxclustersizes, globalp)
+function [cumdf, unique_maxcs, nmaxcs, desc_prop_maxcs, thresholdsize] = ProcessClusterResults(csallsize, csallnum, maxclustersizes, globalp)
     cumdf = cumsum(csallnum);
     if cumdf(end) > 0
         cumdf = cumdf / cumdf(end); % normalizing
@@ -178,13 +178,13 @@ function [cumdf, unique_maxcs, nmaxcs, cummaxcs, thresholdsize] = ProcessCluster
     for ui = 1:length(unique_maxcs)
         nmaxcs(ui) = sum(maxclustersizes==unique_maxcs(ui));
     end
-    cummaxcs = cumsum(nmaxcs);
-    cummaxcs = cummaxcs / cummaxcs(end);
+	desc_prop_maxcs = cumsum(nmaxcs(end:-1:1)) / sum(nmaxcs);
+	desc_prop_maxcs = desc_prop_maxcs(end:-1:1);
 
     thresholdsize = zeros(length(globalp),1);
     for kk = 1:length(globalp)
-        ind = find(cummaxcs > (1-globalp(kk)));
-        if ~isempty(ind) & ind(1) < length(cummaxcs)
+        ind = find(desc_prop_maxcs < globalp(kk));
+        if ~isempty(ind)
             thresholdsize(kk) = unique_maxcs(ind(1));
         else
             thresholdsize(kk) = inf;
@@ -319,17 +319,17 @@ function [binaryvol,rawvol] = ThresholdVol(cdfvol,vol,oneortwotails,localp)
     end
 
 % --------------------
-function DisplayResults(csallsize, csallnum, cumdf, unique_maxcs, nmaxcs, cummaxcs, globalp, thresholdsize)
+function DisplayResults(csallsize, csallnum, cumdf, unique_maxcs, nmaxcs, desc_prop_maxcs, globalp, thresholdsize)
     fprintf('All clusters\n')
-    fprintf('   Size/Mass        Num   Cum. Prop\n')
+    fprintf('   Size/Mass        Number      Proportion >=\n')
     for kk = 1:length(csallsize)
-        fprintf('[      %5d  %9d       %.3f  ]\n',csallsize(kk),csallnum(kk),cumdf(kk))
+        fprintf('[      %5d     %9d      %f  ]\n',csallsize(kk),csallnum(kk),cumdf(kk))
     end
     fprintf('\n')
     fprintf('Maximum cluster for each iteration (used to determine thresholdsize) \n')
-    fprintf('   Size/Mass        Num   Cum. Prop\n')
+    fprintf('   Size/Mass        Number      Proportion >= (i.e. Alpha)\n')
     for kk = 1:length(unique_maxcs)
-        fprintf('[      %5d  %9d       %.3f  ]\n',unique_maxcs(kk),nmaxcs(kk),cummaxcs(kk))
+        fprintf('[      %5d     %9d      %f  ]\n',unique_maxcs(kk),nmaxcs(kk),desc_prop_maxcs(kk))
     end
     fprintf('\n  Global P          Threshold Size/Mass\n')
     for kk = 1:length(thresholdsize)
